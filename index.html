@@ -6,32 +6,29 @@
   <title>스텔라이브 리듬게임 - StellMax</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
-    body { background: #0b0b12; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; user-select: none; }
+    body { background: #0b0b12; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow-x: hidden; user-select: none; }
 
     #bg-container {
-      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
       background: radial-gradient(circle at center, #1e1b4b 0%, #020617 100%);
       z-index: 1; pointer-events: none;
     }
 
-    /* 화면에 전혀 보이지 않게 숨긴 오디오 플레이어 */
-    #audio-stream { display: none; }
-
     .screen-overlay {
-      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      position: absolute; top: 0; left: 0; width: 100vw; min-height: 100vh;
       background: rgba(11, 11, 18, 0.95); z-index: 20;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 20px;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding: 30px 20px; overflow-y: auto;
     }
 
     .card {
       background: #1e293b; border: 1px solid #334155; border-radius: 16px;
-      padding: 28px 24px; width: 100%; max-width: 360px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center;
+      padding: 24px; width: 100%; max-width: 420px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; margin-bottom: 20px;
     }
 
     .card h1 { color: #38bdf8; font-size: 26px; margin-bottom: 8px; }
-    .card p { color: #94a3b8; font-size: 14px; margin-bottom: 24px; }
+    .card p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
 
     .form-group { text-align: left; margin-bottom: 16px; }
     .form-group label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; font-weight: bold; }
@@ -40,18 +37,35 @@
       width: 100%; padding: 12px 14px; font-size: 15px; background: #0f172a; color: #ffffff;
       border: 1px solid #475569; border-radius: 8px; outline: none;
     }
-    input[type="text"]:focus, select:focus { border-color: #38bdf8; }
 
     .btn-primary {
       width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: #fff;
       background: linear-gradient(135deg, #0284c7, #38bdf8); border: none; border-radius: 8px;
-      cursor: pointer; margin-top: 10px; transition: transform 0.1s, opacity 0.2s;
+      cursor: pointer; transition: transform 0.1s;
     }
     .btn-primary:active { transform: scale(0.98); }
 
+    /* 음악 사이트 방식 노래 목록 (카드 레이아웃) */
+    .song-list { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 14px; }
+    .song-card {
+      background: #0f172a; border: 1px solid #334155; border-radius: 12px;
+      padding: 16px; display: flex; align-items: center; gap: 14px; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .song-card.selected { border-color: #38bdf8; background: #1e293b; }
+    .song-cover {
+      width: 60px; height: 60px; border-radius: 8px; background: #334155;
+      display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;
+    }
+    .song-info { text-align: left; flex: 1; }
+    .song-title { font-size: 16px; font-weight: bold; color: #f8fafc; margin-bottom: 4px; }
+    .song-artist { font-size: 13px; color: #94a3b8; }
+    .song-highscore { font-size: 12px; color: #38bdf8; margin-top: 4px; font-weight: bold; }
+
+    /* 리듬게임 메인 화면 */
     #game-container {
       position: relative; width: 100%; max-width: 480px; height: 100vh;
-      margin: 0 auto; background: rgba(12, 12, 24, 0.75);
+      margin: 0 auto; background: rgba(12, 12, 24, 0.85);
       border-left: 2px solid #334155; border-right: 2px solid #334155; z-index: 2;
       display: none;
     }
@@ -83,7 +97,7 @@
     .touch-btn:active { background: rgba(56, 189, 248, 0.35); color: #fff; }
 
     #in-game-ui {
-      position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; flex-direction: column; gap: 6px;
+      position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; flex-direction: column; gap: 4px;
     }
     #user-tag { font-size: 14px; color: #94a3b8; }
     #score-board { font-size: 22px; font-weight: bold; color: #38bdf8; }
@@ -93,47 +107,46 @@
 <body>
 
   <div id="bg-container"></div>
-  <!-- 유튜브 스트림을 오디오로 직접 추출하여 재생하는 태그 -->
-  <audio id="audio-stream" preload="auto"></audio>
+  <audio id="game-audio" preload="auto" crossorigin="anonymous"></audio>
 
   <!-- 1. 로그인 화면 -->
   <div id="login-screen" class="screen-overlay">
     <div class="card">
       <h1>⭐ StellMax</h1>
-      <p>스텔라이브 리듬게임에 오신 것을 환영합니다!</p>
+      <p>기록 저장을 위해 닉네임을 입력하세요.</p>
       <div class="form-group">
         <label for="username-input">플레이어 닉네임</label>
-        <input type="text" id="username-input" placeholder="닉네임을 입력하세요" value="스텔라">
+        <input type="text" id="username-input" placeholder="닉네임 입력">
       </div>
-      <button class="btn-primary" onclick="handleLogin()">접속하기</button>
+      <button class="btn-primary" onclick="handleLogin()">접속 및 기록 시작</button>
     </div>
   </div>
 
-  <!-- 2. 곡 & 난이도 선택 화면 -->
+  <!-- 2. 음원 선택 및 난이도 화면 (음악 사이트 배열 방식) -->
   <div id="select-screen" class="screen-overlay" style="display: none;">
     <div class="card">
-      <h1>🎵 곡 & 난이도 선택</h1>
-      <p id="welcome-msg">환영합니다!</p>
+      <h1>🎵 곡 목록</h1>
+      <p id="welcome-msg">플레이할 곡을 선택하세요.</p>
       
       <div class="form-group">
-        <label for="song-select">노래 선택</label>
-        <select id="song-select"></select>
-      </div>
-
-      <div class="form-group">
-        <label for="difficulty-select">난이도 설정</label>
-        <select id="difficulty-select">
-          <option value="EASY">EASY (속도 느림)</option>
+        <label>난이도 선택</label>
+        <select id="difficulty-select" onchange="renderSongList()">
+          <option value="EASY">EASY (느림)</option>
           <option value="NORMAL" selected>NORMAL (보통)</option>
-          <option value="HARD">HARD (속도 빠름)</option>
+          <option value="HARD">HARD (빠름)</option>
         </select>
       </div>
+    </div>
 
-      <button id="start-btn" class="btn-primary" onclick="startGame()">🎮 게임 시작</button>
+    <!-- 곡 카드 목록이 들어가는 영역 -->
+    <div id="song-list-container" class="song-list"></div>
+
+    <div style="width:100%; max-width:420px; margin-top:20px;">
+      <button id="start-btn" class="btn-primary" onclick="startGame()">🎮 플레이 시작</button>
     </div>
   </div>
 
-  <!-- 3. 리듬게임 메인 화면 -->
+  <!-- 3. 게임 메인 화면 -->
   <div id="game-container">
     <div id="in-game-ui">
       <div id="user-tag">PLAYER: <span id="player-name">스텔라</span></div>
@@ -156,67 +169,99 @@
   </div>
 
   <script>
-    // 🎵 곡 목록 (유튜브 ID만 넣어주면 됩니다)
+    // 🎵 곡 데이터베이스 (나중에 아래 형식대로 계속 추가하시면 됩니다!)
     const songDatabase = [
       {
-        title: "[아라하시 타비] - 물떼새 (千鳥)",
-        ytId: "uBtFoUXR9Qc",
+        id: "song_chidori",
+        title: "물떼새 (千鳥)",
+        artist: "아라하시 타비",
+        cover: "🦤",
+        // 사파리 자동재생 및 CORS 대응 음원
+        audioUrl: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3",
         notes: [
-          { lane: 0, time: 18.0 },
-          { lane: 1, time: 19.5 },
-          { lane: 2, time: 21.0 },
-          { lane: 3, time: 22.5 },
-          { lane: 0, time: 23.5 },
-          { lane: 1, time: 25.0 },
-          { lane: 2, time: 26.0 },
-          { lane: 3, time: 27.5 },
-          { lane: 0, time: 34.0 },
-          { lane: 2, time: 35.5 },
-          { lane: 1, time: 37.0 },
-          { lane: 3, time: 38.5 },
-          { lane: 0, time: 40.0 }
+          { lane: 0, time: 2.0 },
+          { lane: 1, time: 3.5 },
+          { lane: 2, time: 5.0 },
+          { lane: 3, time: 6.5 },
+          { lane: 0, time: 8.0 },
+          { lane: 1, time: 9.5 },
+          { lane: 2, time: 11.0 },
+          { lane: 3, time: 12.5 },
+          { lane: 0, time: 14.0 },
+          { lane: 2, time: 15.5 },
+          { lane: 1, time: 17.0 },
+          { lane: 3, time: 18.5 },
+          { lane: 0, time: 20.0 }
         ]
       }
     ];
 
-    let username = "스텔라";
+    let username = "";
+    let selectedSongIndex = 0;
     let selectedDifficulty = "NORMAL";
     let noteSpeedFactor = 350;
     let activeNotes = [], score = 0, isPlaying = false;
-    
-    const audioElement = document.getElementById('audio-stream');
+
+    const gameAudio = document.getElementById('game-audio');
     const laneKeys = ['D', 'F', 'J', 'K'];
     const laneXPercent = [1, 26, 51, 76];
 
+    // 자동 로그인 체크 (로컬저장소)
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedUser = localStorage.getItem('stellmax_username');
+      if (savedUser) {
+        username = savedUser;
+        showSelectScreen();
+      }
+    });
+
     function handleLogin() {
       const input = document.getElementById('username-input').value.trim();
-      if (input) username = input;
-      
-      document.getElementById('welcome-msg').innerText = `${username}님, 원하는 곡과 난이도를 선택해 주세요!`;
-      document.getElementById('player-name').innerText = username;
-      
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('select-screen').style.display = 'flex';
-      
-      initSongSelect();
+      username = input || "스텔라";
+      localStorage.setItem('stellmax_username', username);
+      showSelectScreen();
     }
 
-    function initSongSelect() {
-      const select = document.getElementById('song-select');
-      select.innerHTML = "";
-      songDatabase.forEach((song, i) => {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = song.title;
-        select.appendChild(opt);
+    function showSelectScreen() {
+      document.getElementById('player-name').innerText = username;
+      document.getElementById('welcome-msg').innerText = `${username}님, 플레이할 곡을 선택하세요.`;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('select-screen').style.display = 'flex';
+      renderSongList();
+    }
+
+    // 노래 목록 (카드뷰) 렌더링 및 최고 점수 불러오기
+    function renderSongList() {
+      const container = document.getElementById('song-list-container');
+      const diff = document.getElementById('difficulty-select').value;
+      container.innerHTML = "";
+
+      songDatabase.forEach((song, index) => {
+        const highScoreKey = `stellmax_hs_${username}_${song.id}_${diff}`;
+        const highScore = localStorage.getItem(highScoreKey) || 0;
+
+        const card = document.createElement('div');
+        card.className = `song-card ${index === selectedSongIndex ? 'selected' : ''}`;
+        card.onclick = () => {
+          selectedSongIndex = index;
+          renderSongList();
+        };
+
+        card.innerHTML = `
+          <div class="song-cover">${song.cover}</div>
+          <div class="song-info">
+            <div class="song-title">${song.title}</div>
+            <div class="song-artist">${song.artist}</div>
+            <div class="song-highscore">BEST: ${highScore} pts</div>
+          </div>
+        `;
+        container.appendChild(card);
       });
     }
 
+    // 게임 시작
     function startGame() {
-      const selectElement = document.getElementById('song-select');
-      const selectedIndex = selectElement.value || 0;
-      const song = songDatabase[selectedIndex];
-      
+      const song = songDatabase[selectedSongIndex];
       selectedDifficulty = document.getElementById('difficulty-select').value;
       document.getElementById('diff-display').innerText = selectedDifficulty;
 
@@ -227,29 +272,30 @@
       document.getElementById('select-screen').style.display = 'none';
       document.getElementById('game-container').style.display = 'block';
 
-      // 광고를 피하기 위해 우회 오디오 라이브러리 스트림 주소 연결
-      audioElement.src = `https://pipe-api.kavin.rocks/stream/${song.ytId}`;
-      audioElement.currentTime = 0;
+      // 사파리 터치 제약 해제 후 오디오 준비
+      gameAudio.src = song.audioUrl;
+      gameAudio.currentTime = 0;
 
-      audioElement.play().then(() => {
-        score = 0;
-        document.getElementById('score').innerText = score;
-        activeNotes = JSON.parse(JSON.stringify(song.notes));
-        isPlaying = true;
-        requestAnimationFrame(updateGame);
-      }).catch(() => {
-        score = 0;
-        document.getElementById('score').innerText = score;
-        activeNotes = JSON.parse(JSON.stringify(song.notes));
-        isPlaying = true;
-        requestAnimationFrame(updateGame);
-      });
+      const playPromise = gameAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          score = 0;
+          document.getElementById('score').innerText = score;
+          activeNotes = JSON.parse(JSON.stringify(song.notes));
+          isPlaying = true;
+          requestAnimationFrame(updateGame);
+        }).catch(err => {
+          console.error("Audio Play Error:", err);
+          alert("오디오를 시작할 수 없습니다. 화면을 다시 클릭해 주세요.");
+        });
+      }
     }
 
+    // 메인 오디오 루프
     function updateGame() {
       if (!isPlaying) return;
 
-      const currentTime = audioElement.currentTime || 0;
+      const currentTime = gameAudio.currentTime || 0;
       const gameContainer = document.getElementById('game-container');
       document.querySelectorAll('.note').forEach(n => n.remove());
 
@@ -268,18 +314,32 @@
         }
       });
 
-      if (audioElement.ended) {
+      if (gameAudio.ended) {
         isPlaying = false;
-        alert(`플레이 완료! 총점: ${score}점`);
-        location.reload();
+        
+        // 최고점수 저장
+        const song = songDatabase[selectedSongIndex];
+        const highScoreKey = `stellmax_hs_${username}_${song.id}_${selectedDifficulty}`;
+        const currentBest = parseInt(localStorage.getItem(highScoreKey) || "0");
+        
+        if (score > currentBest) {
+          localStorage.setItem(highScoreKey, score);
+          alert(`🎉 축하합니다! 신기록 달성!\n최종 점수: ${score}점`);
+        } else {
+          alert(`플레이 완료!\n최종 점수: ${score}점 (최고 점수: ${currentBest}점)`);
+        }
+
+        document.getElementById('game-container').style.display = 'none';
+        showSelectScreen();
       } else {
         requestAnimationFrame(updateGame);
       }
     }
 
+    // 터치 판정
     function checkHit(laneIndex) {
       if (!isPlaying) return;
-      const currentTime = audioElement.currentTime || 0;
+      const currentTime = gameAudio.currentTime || 0;
       const hitIndex = activeNotes.findIndex(n => n.lane === laneIndex && Math.abs(n.time - currentTime) < 0.25);
 
       if (hitIndex !== -1) {
