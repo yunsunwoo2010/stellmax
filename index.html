@@ -3,21 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>스텔라이브 리듬게임</title>
+  <title>스텔라이브 리듬게임 - StellMax</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
-    body { background: #0b0b12; color: #fff; font-family: sans-serif; overflow: hidden; user-select: none; }
+    body { background: #0b0b12; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; user-select: none; }
 
+    /* 유튜브 배경 영상 */
     #video-container {
       position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
-      pointer-events: none; opacity: 0.4; z-index: 1; overflow: hidden;
+      pointer-events: none; opacity: 0.35; z-index: 1; overflow: hidden;
     }
     #player { width: 100vw; height: 100vh; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1.2); }
 
+    /* 모달 / 메인 스크린 공통 */
+    .screen-overlay {
+      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(11, 11, 18, 0.9); z-index: 20;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+
+    .card {
+      background: #1e293b; border: 1px solid #334155; border-radius: 16px;
+      padding: 28px 24px; width: 100%; max-width: 360px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center;
+    }
+
+    .card h1 { color: #38bdf8; font-size: 26px; margin-bottom: 8px; }
+    .card p { color: #94a3b8; font-size: 14px; margin-bottom: 24px; }
+
+    .form-group { text-align: left; margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; font-weight: bold; }
+    
+    input[type="text"], select {
+      width: 100%; padding: 12px 14px; font-size: 15px; background: #0f172a; color: #ffffff;
+      border: 1px solid #475569; border-radius: 8px; outline: none;
+    }
+    input[type="text"]:focus, select:focus { border-color: #38bdf8; }
+
+    .btn-primary {
+      width: 100%; padding: 14px; font-size: 16px; font-weight: bold; color: #fff;
+      background: linear-gradient(135deg, #0284c7, #38bdf8); border: none; border-radius: 8px;
+      cursor: pointer; margin-top: 10px; transition: transform 0.1s, opacity 0.2s;
+    }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { background: #475569; opacity: 0.6; cursor: not-allowed; }
+
+    /* 게임 화면 요소를 담는 컨테이너 */
     #game-container {
       position: relative; width: 100%; max-width: 480px; height: 100vh;
       margin: 0 auto; background: rgba(12, 12, 24, 0.75);
       border-left: 2px solid #334155; border-right: 2px solid #334155; z-index: 2;
+      display: none; /* 로그인 및 난이도 선택 후 표시 */
     }
 
     .lane {
@@ -46,216 +83,59 @@
     }
     .touch-btn:active { background: rgba(56, 189, 248, 0.35); color: #fff; }
 
-    #ui-overlay {
-      position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; flex-direction: column; gap: 8px; width: 260px;
+    #in-game-ui {
+      position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; flex-direction: column; gap: 6px;
     }
-    
-    select {
-      width: 100%; padding: 12px 14px; font-size: 15px; background: #1e293b; color: #ffffff;
-      border: 1px solid #475569; border-radius: 8px; cursor: pointer;
-    }
-    select option { background: #1e293b; color: #ffffff; }
-
-    button {
-      padding: 12px 14px; font-size: 15px; background: #1e293b; color: #fff;
-      border: 1px solid #475569; border-radius: 8px; cursor: pointer; font-weight: bold;
-    }
-    button:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
-    #score-board { font-size: 20px; font-weight: bold; margin-top: 5px; color: #38bdf8; }
+    #user-tag { font-size: 14px; color: #94a3b8; }
+    #score-board { font-size: 22px; font-weight: bold; color: #38bdf8; }
+    #diff-tag { font-size: 12px; color: #f43f5e; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <div id="ui-overlay">
-    <select id="song-select"></select>
-    <button id="start-btn" onclick="startGame()">⏳ 준비 중...</button>
-    <div id="score-board">SCORE: <span id="score">0</span></div>
-  </div>
-
+  <!-- 유튜브 배경 재생기 -->
   <div id="video-container">
     <div id="player"></div>
   </div>
 
-  <div id="game-container">
-    <div class="lane" style="left: 0%;"></div>
-    <div class="lane" style="left: 25%;"></div>
-    <div class="lane" style="left: 50%;"></div>
-    <div class="lane" style="left: 75%;"></div>
-    <div id="judge-line"></div>
-
-    <div id="touch-controls">
-      <div class="touch-btn" id="btn-0">D</div>
-      <div class="touch-btn" id="btn-1">F</div>
-      <div class="touch-btn" id="btn-2">J</div>
-      <div class="touch-btn" id="btn-3">K</div>
+  <!-- 1. 로그인 화면 -->
+  <div id="login-screen" class="screen-overlay">
+    <div class="card">
+      <h1>⭐ StellMax</h1>
+      <p>스텔라이브 리듬게임에 오신 것을 환영합니다!</p>
+      <div class="form-group">
+        <label for="username-input">플레이어 닉네임</label>
+        <input type="text" id="username-input" placeholder="닉네임을 입력하세요" value="스텔라">
+      </div>
+      <button class="btn-primary" onclick="handleLogin()">접속하기</button>
     </div>
   </div>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
-  <script>
-    const songDatabase = [
-      {
-        title: "[아라하시 타비] - 물떼새",
-        videoId: "uBtFoUXR9Qc",
-        notes: [
-          { lane: 0, time: 18.0 },
-          { lane: 1, time: 19.5 },
-          { lane: 2, time: 21.0 },
-          { lane: 3, time: 22.5 },
-          { lane: 0, time: 23.5 },
-          { lane: 1, time: 25.0 },
-          { lane: 2, time: 26.0 },
-          { lane: 3, time: 27.5 },
-          { lane: 0, time: 34.0 },
-          { lane: 2, time: 35.5 },
-          { lane: 1, time: 37.0 },
-          { lane: 3, time: 38.5 },
-          { lane: 0, time: 40.0 }
-        ]
-      }
-    ];
-
-    let player = null, activeNotes = [], score = 0, isPlaying = false;
-    const laneKeys = ['D', 'F', 'J', 'K'];
-    const laneXPercent = [1, 26, 51, 76];
-
-    function initSongSelect() {
-      const select = document.getElementById('song-select');
-      if (!select) return;
-      select.innerHTML = "";
-      songDatabase.forEach((song, i) => {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = song.title;
-        select.appendChild(opt);
-      });
-    }
-    initSongSelect();
-
-    function onYouTubeIframeAPIReady() {
-      try {
-        player = new YT.Player('player', {
-          videoId: songDatabase[0].videoId,
-          playerVars: {
-            'autoplay': 0,
-            'controls': 0,
-            'disablekb': 1,
-            'fs': 0,
-            'iv_load_policy': 3,
-            'modestbranding': 1,
-            'playsinline': 1,
-            'rel': 0
-          },
-          events: {
-            'onReady': () => {
-              const startBtn = document.getElementById('start-btn');
-              startBtn.innerText = "🎮 게임 시작";
-              startBtn.disabled = false;
-            }
-          }
-        });
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        const startBtn = document.getElementById('start-btn');
-        if (startBtn.disabled) {
-          startBtn.innerText = "🎮 게임 시작";
-          startBtn.disabled = false;
-        }
-      }, 2000);
-    });
-
-    function startGame() {
-      const selectElement = document.getElementById('song-select');
-      const selectedIndex = selectElement.value || 0;
-      const song = songDatabase[selectedIndex];
+  <!-- 2. 곡 및 난이도 선택 화면 -->
+  <div id="select-screen" class="screen-overlay" style="display: none;">
+    <div class="card">
+      <h1>🎵 곡 & 난이도 선택</h1>
+      <p id="welcome-msg">환영합니다!</p>
       
-      if (player && player.loadVideoById) {
-        try {
-          player.loadVideoById({ 'videoId': song.videoId, 'startSeconds': 0 });
-          player.playVideo();
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      <div class="form-group">
+        <label for="song-select">노래 선택</label>
+        <select id="song-select"></select>
+      </div>
 
-      score = 0;
-      document.getElementById('score').innerText = score;
-      activeNotes = JSON.parse(JSON.stringify(song.notes));
-      isPlaying = true;
+      <div class="form-group">
+        <label for="difficulty-select">난이도 설정</label>
+        <select id="difficulty-select">
+          <option value="EASY">EASY (속도 느림)</option>
+          <option value="NORMAL" selected>NORMAL (보통)</option>
+          <option value="HARD">HARD (속도 빠름)</option>
+        </select>
+      </div>
 
-      requestAnimationFrame(updateGame);
-    }
+      <button id="start-btn" class="btn-primary" onclick="startGame()">🎮 게임 시작</button>
+    </div>
+  </div>
 
-    function updateGame() {
-      if (!isPlaying) return;
-
-      let currentTime = 0;
-      try {
-        if (player && player.getCurrentTime) {
-          currentTime = player.getCurrentTime() || 0;
-        }
-      } catch (e) {
-        currentTime = 0;
-      }
-
-      const gameContainer = document.getElementById('game-container');
-      document.querySelectorAll('.note').forEach(n => n.remove());
-
-      activeNotes.forEach((note) => {
-        const timeDiff = note.time - currentTime;
-        if (timeDiff <= 2.0 && timeDiff >= -0.2) {
-          const noteElement = document.createElement('div');
-          noteElement.className = 'note';
-          noteElement.style.left = laneXPercent[note.lane] + '%';
-          
-          const targetY = window.innerHeight - 120; 
-          const currentY = targetY - (timeDiff * 350); 
-          
-          noteElement.style.top = currentY + 'px';
-          gameContainer.appendChild(noteElement);
-        }
-      });
-
-      requestAnimationFrame(updateGame);
-    }
-
-    function checkHit(laneIndex) {
-      if (!isPlaying) return;
-      let currentTime = 0;
-      try {
-        if (player && player.getCurrentTime) {
-          currentTime = player.getCurrentTime() || 0;
-        }
-      } catch (e) {
-        currentTime = 0;
-      }
-
-      const hitIndex = activeNotes.findIndex(n => n.lane === laneIndex && Math.abs(n.time - currentTime) < 0.25);
-
-      if (hitIndex !== -1) {
-        score += 100;
-        document.getElementById('score').innerText = score;
-        activeNotes.splice(hitIndex, 1);
-      }
-    }
-
-    window.addEventListener('keydown', (e) => {
-      const laneIndex = laneKeys.indexOf(e.key.toUpperCase());
-      if (laneIndex !== -1) checkHit(laneIndex);
-    });
-
-    for (let i = 0; i < 4; i++) {
-      const btn = document.getElementById(`btn-${i}`);
-      btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        checkHit(i);
-      });
-    }
-  </script>
-</body>
-</html>
+  <!-- 3. 리듬게임 메인 화면 -->
+  <div id="game-container">
+    <div id="in-game-ui">
+      <div id="user-tag">PLAYER
